@@ -168,10 +168,18 @@ Jason 压力测试后,规则从"handoff 继承"切换到"first-principles deriva
 
 | 优先级 | 源 | 用途 |
 |---|---|---|
-| ❶ 执行价 | **OKX / Hyperliquid mark**(Jason 交易所在地) | 开仓/止损实际价 |
-| ❷ 交叉 | **Binance Spot API** + **Binance Futures API** | 24h OHLCV、funding、OI、EMA |
-| ❸ 备用 | Jason 手报 app 上价 | 沙箱/网络故障时对齐 |
-| 禁用 | CoinGecko / Yahoo / CMC 网页标题 | 滞后、错源 |
+| ❶ 执行价 | **OKX public API**(`scripts/fetch_okx.py`,Jason 本地跑) | mark、funding、OI — 与 Jason OKX 屏幕同源 |
+| ❷ 交叉 + EMA | **Binance Spot API**(`scripts/fetch_binance.py`) | 24h OHLCV、日线 klines 算 EMA |
+| ❸ 备用 | Jason 手报 OKX app 价 | 没跑脚本时对齐 |
+| 禁用 | WebSearch 标题、CoinGecko、Yahoo、CMC | 延迟 5-30 分钟,曾误导决策 |
+
+### 7.1.a API key 政策(明确)
+**永不使用 Jason 的 OKX 私有 API key。** 原因:
+- Claude Code 沙箱屏蔽 OKX 域名,key 给了也无法调用
+- 对话传输 / git commit 任何泄露都是真实资金损失风险
+- 我们的 swing 频率(数次/月)不需要自动化执行
+- 公共行情 API **不需要** key,本地跑脚本就够了
+- 所有交易由 Jason **手动在 OKX 界面执行**(纪律 + 安全)
 
 ### 7.2 一致性
 - 执行所 vs Binance 偏差 > 0.5% → ⚠️ 告警,以执行所手报为准
