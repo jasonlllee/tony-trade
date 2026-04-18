@@ -1,12 +1,13 @@
 """
-Tony daily check — exchange-native data, no third-party aggregators.
+Tony daily check — exchange-native data only.
 
-Primary:   OKX public API (mark price + funding + OI; Jason trades here)
-Secondary: Binance spot (24h OHLCV + EMA from daily klines, cross-check)
+Primary:   Hyperliquid (perp mark + funding + OI — deep derivatives sentiment)
+Backup:    Coinbase Exchange (US-regulated spot anchor)
+EMA/hist:  Binance daily klines (longest clean history)
 
 Run locally (Claude Code sandbox blocks all exchange APIs):
     python3 scripts/daily_check.py
-    python3 scripts/daily_check.py --quick   # OKX-only, skip EMA/Binance
+    python3 scripts/daily_check.py --quick   # HL + Coinbase only, skip EMA
 
 Output: human-readable report + JSON block to paste back into the chat.
 """
@@ -21,10 +22,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import fetch_binance as bn  # noqa: E402
-import fetch_okx as okx  # noqa: E402
+import fetch_coinbase as cb  # noqa: E402
+import fetch_hyperliquid as hl  # noqa: E402
 import indicators as ind  # noqa: E402
 
-INSTS_OKX = ("BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP")
+COINS_HL = ("BTC", "ETH", "SOL", "HYPE")
+PAIRS_CB = ("BTC-USD", "ETH-USD", "SOL-USD")
 PAIRS_BN = {"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT", "SOLUSDT": "SOLUSDT"}
 
 
@@ -36,66 +39,77 @@ def usd(x, digits=0):
     return "n/a" if x is None else f"${x:,.{digits}f}"
 
 
-def funding_tag(fund_pct):
-    if fund_pct is None:
+def funding_tag(fund_8h_pct):
+    if fund_8h_pct is None:
         return "n/a"
-    if fund_pct > 0.05:
-        return f"{fund_pct:+.4f}% (hot — longs crowded)"
-    if fund_pct > 0.02:
-        return f"{fund_pct:+.4f}% (elevated)"
-    if fund_pct > -0.01:
-        return f"{fund_pct:+.4f}% (healthy)"
-    return f"{fund_pct:+.4f}% (shorts crowded — contrarian long)"
+    if fund_8h_pct > 0.05:
+        return f"{fund_8h_pct:+.4f}% (hot — longs crowded)"
+    if fund_8h_pct > 0.02:
+        return f"{fund_8h_pct:+.4f}% (elevated)"
+    if fund_8h_pct > -0.01:
+        return f"{fund_8h_pct:+.4f}% (healthy)"
+    return f"{fund_8h_pct:+.4f}% (shorts crowded — contrarian long)"
 
 
-def cross_check(okx_mark, bn_last):
-    if okx_mark is None or bn_last is None:
+def cross_check(primary, backup, label_p="HL", label_b="Coinbase"):
+    if primary is None or backup is None:
         return "one source missing"
-    diff_pct = abs(okx_mark - bn_last) / bn_last * 100
-    if diff_pct > 0.5:
-        return f"⚠️ {diff_pct:.2f}% divergence — re-verify before trading"
-    return f"✅ aligned ({diff_pct:.2f}%)"
+    diff_pct = abs(primary - backup) / backup * 100
+    tag = "⚠️" if diff_pct > 0.5 else "✅"
+    return f"{tag} {label_p} vs {label_b}: {diff_pct:.2f}% diff"
 
 
 def run(quick=False):
-    okx_snap = okx.snapshot(INSTS_OKX)
-    out = {"ts_utc": int(time.time()), "okx": okx_snap}
+    hl_snap = hl.snapshot(COINS_HL)
+    cb_snap = cb.snapshot(PAIRS_CB)
+
+    out = {
+        "ts_utc": int(time.time()),
+        "hyperliquid": hl_snap,
+        "coinbase": cb_snap,
+    }
+
+    hl_btc = hl_snap.get("BTC", {}).get("mark")
+    cb_btc = cb_snap.get("BTC-USD", {}).get("last")
+    out["btc_cross_check"] = cross_check(hl_btc, cb_btc)
 
     if not quick:
-        bn_snap = bn.snapshot(PAIRS_BN)
         btc_daily = bn.klines("BTCUSDT", "1d", 250)
         eth_daily = bn.klines("ETHUSDT", "1d", 250)
-        out["binance"] = bn_snap
         out["btc_indicators"] = ind.summary(btc_daily)
         out["eth_indicators"] = ind.summary(eth_daily)
-        okx_btc_mark = okx_snap.get("BTC-USDT-SWAP", {}).get("mark")
-        bn_btc_last = bn_snap.get("BTCUSDT", {}).get("spot_last")
-        out["price_cross_check"] = cross_check(okx_btc_mark, bn_btc_last)
     return out
 
 
 def print_report(r):
-    okx_ = r["okx"]
-    btc = okx_.get("BTC-USDT-SWAP", {})
-    eth = okx_.get("ETH-USDT-SWAP", {})
-    sol = okx_.get("SOL-USDT-SWAP", {})
+    hl_ = r["hyperliquid"]
+    cb_ = r["coinbase"]
+    btc_hl = hl_.get("BTC", {})
+    eth_hl = hl_.get("ETH", {})
+    sol_hl = hl_.get("SOL", {})
+    hype_hl = hl_.get("HYPE", {})
+    btc_cb = cb_.get("BTC-USD", {})
 
     print("=" * 60)
     print(f"DAILY CHECK — {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(r['ts_utc']))}")
     print("=" * 60)
 
-    print("\n[OKX — execution venue, authoritative]")
-    print(f"  BTC-USDT-SWAP  mark={usd(btc.get('mark'))}  last={usd(btc.get('last'))}")
-    print(f"                 24h: {usd(btc.get('low_24h'))} – {usd(btc.get('high_24h'))}")
-    print(f"                 funding: {funding_tag(btc.get('funding_rate_pct'))}")
-    print(f"                 OI: {btc.get('open_interest_ccy', 0):,.1f} BTC ({usd(btc.get('open_interest_usd'))})")
-    print(f"  ETH-USDT-SWAP  mark={usd(eth.get('mark'), 2)}  funding={funding_tag(eth.get('funding_rate_pct'))}")
-    print(f"  SOL-USDT-SWAP  mark={usd(sol.get('mark'), 2)}  funding={funding_tag(sol.get('funding_rate_pct'))}")
+    print("\n[HYPERLIQUID — primary, perp]")
+    print(f"  BTC  mark={usd(btc_hl.get('mark'))}  24h={pct(btc_hl.get('chg_24h_pct'))}")
+    print(f"       funding(8h): {funding_tag(btc_hl.get('funding_8h_pct'))}")
+    print(f"       OI: {btc_hl.get('open_interest', 0):,.1f}")
+    print(f"  ETH  mark={usd(eth_hl.get('mark'), 2)}  24h={pct(eth_hl.get('chg_24h_pct'))}")
+    print(f"  SOL  mark={usd(sol_hl.get('mark'), 2)}  24h={pct(sol_hl.get('chg_24h_pct'))}")
+    print(f"  HYPE mark={usd(hype_hl.get('mark'), 2)}  24h={pct(hype_hl.get('chg_24h_pct'))}")
 
-    if "binance" in r:
+    print(f"\n[COINBASE — backup, spot]")
+    print(f"  BTC-USD  last={usd(btc_cb.get('last'))}  24h={pct(btc_cb.get('chg_24h_pct'))}")
+    print(f"           24h range: {usd(btc_cb.get('low_24h'))} – {usd(btc_cb.get('high_24h'))}")
+    print(f"  cross-check: {r['btc_cross_check']}")
+
+    if "btc_indicators" in r:
         ind_btc = r["btc_indicators"]
-        print(f"\n[BINANCE — cross-check + EMAs]")
-        print(f"  cross-check: {r['price_cross_check']}")
+        print(f"\n[BINANCE — EMAs from daily closes]")
         print(f"  BTC last close: {usd(ind_btc.get('last_close'))}")
         for p in (50, 100, 200):
             e = ind_btc["emas"].get(p)
@@ -110,11 +124,11 @@ def print_report(r):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--quick", action="store_true", help="OKX only, skip Binance EMA")
+    ap.add_argument("--quick", action="store_true", help="HL + Coinbase only, skip Binance EMA")
     args = ap.parse_args()
     try:
         print_report(run(quick=args.quick))
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
-        print("HINT: OKX/Binance APIs may be unreachable. Run from a machine with open internet.", file=sys.stderr)
+        print("HINT: HL/Coinbase/Binance APIs may be unreachable. Run from machine with open internet.", file=sys.stderr)
         sys.exit(1)

@@ -168,14 +168,15 @@ Jason 压力测试后,规则从"handoff 继承"切换到"first-principles deriva
 
 | 优先级 | 源 | 用途 |
 |---|---|---|
-| ❶ 执行价 | **OKX public API**(`scripts/fetch_okx.py`,Jason 本地跑) | mark、funding、OI — 与 Jason OKX 屏幕同源 |
-| ❷ 交叉 + EMA | **Binance Spot API**(`scripts/fetch_binance.py`) | 24h OHLCV、日线 klines 算 EMA |
-| ❸ 备用 | Jason 手报 OKX app 价 | 没跑脚本时对齐 |
+| ❶ 主 | **Hyperliquid Info API**(`scripts/fetch_hyperliquid.py`,Jason 本地跑) | perp mark、funding(per-hour 转 8h)、OI — 衍生品情绪权威 |
+| ❷ 备 | **Coinbase Exchange API**(`scripts/fetch_coinbase.py`) | US 监管现货锚,用于交叉验证 |
+| ❸ EMA / 历史 | **Binance Spot API**(`scripts/fetch_binance.py`) | 最长清洁日线 klines 序列 |
+| ❹ 执行对齐 | Jason 手报 OKX mark 价 | 实际成交价以 OKX 为准 |
 | 禁用 | WebSearch 标题、CoinGecko、Yahoo、CMC | 延迟 5-30 分钟,曾误导决策 |
 
 ### 7.1.a API key 政策(明确)
-**永不使用 Jason 的 OKX 私有 API key。** 原因:
-- Claude Code 沙箱屏蔽 OKX 域名,key 给了也无法调用
+**永不使用 Jason 的交易所私有 API key。** 原因:
+- Claude Code 沙箱屏蔽交易所域名,key 给了也无法调用
 - 对话传输 / git commit 任何泄露都是真实资金损失风险
 - 我们的 swing 频率(数次/月)不需要自动化执行
 - 公共行情 API **不需要** key,本地跑脚本就够了
