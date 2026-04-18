@@ -185,12 +185,26 @@ Jason 压力测试后,规则从"handoff 继承"切换到"first-principles deriva
 - 执行所 vs Binance 偏差 > 0.5% → ⚠️ 告警,以执行所手报为准
 - ETF 流向 / 宏观 / 事件 → web_search 允许(不是交易所数据)
 
-### 7.3 沙箱限制
-Claude Code 沙箱默认屏蔽交易所 API。流程:
-1. Jason 本地跑 `python3 scripts/daily_check.py`
-2. JSON 输出贴回对话
-3. Tony 读 JSON 后决策
-4. 仅口语价时,Tony 只做方向判断,不给入场/止损数字
+### 7.3 沙箱限制(2026-04-17 验证)
+
+**Claude Code 沙箱屏蔽几乎所有外部行情源**(测试过):
+
+| 类别 | 直连 / WebFetch |
+|---|---|
+| 交易所 API(OKX/Binance/HL/Coinbase/Kraken/Bybit/Bitfinex/Gate/KuCoin) | ❌ 403 |
+| 聚合(CoinGecko/CMC/CoinCap/CryptoCompare) | ❌ 403 |
+| 财经站(TradingView/Yahoo/CNBC) | ❌ 403 |
+| **WebSearch**(Google) | ✅ 唯一可用,但 5-30min 延迟 |
+
+### 7.4 实操三条路径
+
+| 用途 | 路径 | 实时性 |
+|---|---|---|
+| 决策时(开仓前 / 改止损前) | Jason 本地跑 `fetch_okx.py` 贴 JSON,或手报 OKX mark | 实时,权威 |
+| 闲聊期 / ETF / 宏观 | Tony 用 WebSearch | 5-30min 延迟,可接受 |
+| 盘后复盘 | Jason 跑 `daily_check.py`(OKX + Binance EMA) | 完整数据 |
+
+**铁律**:Tony 在没有 (1) 数据时,**只做方向判断,不给具体入场/止损数字**。
 
 ---
 
