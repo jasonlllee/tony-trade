@@ -1,7 +1,10 @@
 # MEMORY.md — Tony 持仓与账户状态
 
+> **Plan Name**: 5w-100w Plan(起始 $50K,目标 $1M,即 20x 账户 / ~10x BTC-alpha)
 > **最后更新**: 2026-04-19
-> **资金规模**: $50,000 USDT(从 $100K 下调,作为 BTC-alpha 加速器尾仓)
+> **资金规模**: $50,000 USDT
+> **成功路径**: 组合拳 + milestone 提利滚雪球(非单腿 one-shot)
+> **现实概率估计**: 5-8%(aspirational target,非规划值)
 > **协议**: 每次开仓 / 加减仓 / 平仓 / 计划调整后,Tony 必须同步更新这里。
 
 ---
@@ -52,10 +55,12 @@
 |---|---|---|
 | HYPE-A | 5/6 解锁后 14 天内,HYPE → $30-34 | 分 3 档 DCA: $34/$31/$28 |
 | HYPE-B | BTC < $60K + HYPE → $25-30 | 加大仓位 DCA |
-| HYPE-C | 2026-06-30 仍无 A/B,HYPE 在 $40-50 | 半仓 DCA 3 周建完 |
-| BTC-A | BTC mark < $58,000 第一次 | 建 BTC perp long, 2.5x, 分 3 档 |
+| HYPE-C | 2026-06-30 仍无 A/B,HYPE 在 $40-50 | **不强行进 HYPE,预算转到 BTC perp 腿**(因为 $40+ HYPE 的 R:R 已经不如 BTC perp) |
+| HYPE-SHORT | 解锁前 HYPE 冲到 $50+ 被拒 + 三重背离 | 小仓做空,3% 风险,止损 $57 |
+| BTC-A | BTC mark < $58,000 第一次 | 建 BTC perp long, 2.5-3x, 分 3 档 |
 | BTC-B | 周线 RSI<30 + F&G<15 + ETF 连续流出 4 周 | 即使价格 $60-70K 也启动 |
 | BTC-C | BTC 在 $55-65K 出现周线反转 K + funding 深度负 | 立即建仓 |
+| BTC-D(备) | 如果 HYPE-C 转预算过来 + BTC 在 $65-70K 无触发 | 在 $65-70K 用 2x 杠杆建 BTC long 初始小仓 |
 | 空 | BTC 反弹 $95-105K + 三重背离 + 收盘无法破 | 小仓做空,3% 风险 |
 
 ### 退出 / TP 规则
